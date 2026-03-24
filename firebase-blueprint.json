@@ -1,0 +1,24 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Post",
+      "description": "게시판에 올라온 글",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "문서 ID" },
+        "content": { "type": "string", "description": "글 내용" },
+        "authorId": { "type": "string", "description": "작성자 UID" },
+        "authorName": { "type": "string", "description": "작성자 이름" },
+        "authorPhoto": { "type": "string", "description": "작성자 프로필 사진 URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "작성 일시" }
+      },
+      "required": ["content", "authorId", "authorName", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "전체 게시글 목록"
+    }
+  }
+}

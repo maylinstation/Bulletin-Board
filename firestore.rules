@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: posts
+    // Document ID: auto-generated
+    // Fields:
+    //   - content: string (required, 1-1000 chars) - 게시글 내용
+    //   - authorId: string (required, immutable) - 작성자 UID
+    //   - authorName: string (required) - 작성자 이름
+    //   - authorPhoto: string (optional) - 작성자 프로필 사진 URL
+    //   - createdAt: timestamp (required, immutable) - 작성 일시
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidPost(data) {
+      return hasRequiredFields(['content', 'authorId', 'authorName', 'createdAt']) &&
+             hasOnlyAllowedFields(['content', 'authorId', 'authorName', 'authorPhoto', 'createdAt']) &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 1000 &&
+             data.authorId is string &&
+             data.authorName is string && data.authorName.size() > 0 && data.authorName.size() < 100 &&
+             (data.authorPhoto == null || (data.authorPhoto is string && data.authorPhoto.size() < 2000)) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /posts/{postId} {
+      // 누구나 읽을 수 있음 (인증된 사용자만)
+      allow read: if isAuthenticated();
+      
+      // 인증된 사용자만 작성 가능, 본인 UID여야 함
+      allow create: if isAuthenticated() && 
+                      isValidPost(request.resource.data) &&
+                      request.resource.data.authorId == request.auth.uid &&
+                      request.resource.data.createdAt == request.time;
+      
+      // 작성자만 수정/삭제 가능 (이 앱에서는 수정 기능을 넣지 않을 수도 있지만 규칙은 정의)
+      allow update: if isOwner(resource.data.authorId) &&
+                      isValidPost(request.resource.data) &&
+                      request.resource.data.authorId == resource.data.authorId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+                      
+      allow delete: if isOwner(resource.data.authorId);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
